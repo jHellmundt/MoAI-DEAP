@@ -1,4 +1,4 @@
-%matplotlib inline
+# %matplotlib inline
 from deap import creator, base, tools, gp, algorithms
 import matplotlib.pyplot as plt
 import random
@@ -34,143 +34,101 @@ def update_neighbours(neigh1, neigh2):
 
 
 def color_fields(individual):
-    color_numbers = [0] * COLORS
-    counts = np.zeros(individual.shape, dtype=int) + 1
-    neighbours = np.frompyfunc(dict, 0, 1)(np.empty((individual.shape[0], individual.shape[1]), dtype=object))
-    # Fields: ('all field pixels', 'pixel count', 'all neighbour fields')
-    # 'all neighbour fields': dictionary with colors as key and list of ('field representative', 'number of neighbouring pixels')
+    counts = np.zeros(individual.shape, dtype = int) + 1
+    neighbours = np.frompyfunc(dict, 0, 1)(np.empty((individual.shape[0],individual.shape[1]), dtype = object))
     fields = dict()
-    # Conflicts: dictionary with colors as key and list of ((x1, y1), (x2, y2))
     conflicts = dict()
     for i in range(1, COLORS + 1):
         conflicts[i] = []
         fields[i] = []
-
     # Count the number of pixels of the same color in each field
-    for col in range(0, individual.shape[0]):
-        for row in range(0, individual.shape[1]):
+    for row in range(0, individual.shape[0]):
+        for col in range(0, individual.shape[1]):
             color = individual[row, col]
-            change = 0  # 0 = unchanged, 1 = vertical, 2 = horizontal
-
-            # Get the neighbour above, if it's not of the same color
-            if row - 1 >= 0 and color != individual[row - 1, col]:
-                neighbours[row, col].setdefault(individual[row - 1, col], []).append((row - 1, col))
-
-            # Get the neighbour to the right, if it's not of the same color
-            if col - 1 >= 0 and color != individual[row, col - 1]:
-                neighbours[row, col].setdefault(individual[row, col - 1], []).append((row, col - 1))
-
-            # Get the neighbour from below
-            if row + 1 < individual.shape[0]:
-                # Set the change to vertical
-                if color == individual[row + 1, col] and not change:
-                    change = 1
-                    # If there is a neighbour of the same color to the left: create a conflict between it
-                    # and the neighbour of the same color below
-                    if col + 1 < individual.shape[1] and color == individual[row + 1, col] and color == individual[
-                        row, col + 1]:
-                        conflicts[color] += [((row + 1, col), (row, col + 1))]
-                # If there is no neighbour with the same color below, add the neighbour to the list
-                else:
+            change = 0  # 0 = unchanged, 1 = horizontal, 2 = vertical
+            if counts[row, col] != 0:
+                next_row = row + 1 < individual.shape[0]
+                next_col = col + 1 < individual.shape[1]
+                # Get all neighbours
+                if next_row and color != individual[row + 1, col]:
                     neighbours[row, col].setdefault(individual[row + 1, col], []).append((row + 1, col))
-
-            # Get the neighbour to the left
-            if col + 1 < individual.shape[1]:
-                # Set the change to horizontal
-                if color == individual[row, col + 1] and not change:
-                    change = 2
-                # If there is no neighbour with the same color to the left, add the neighbour to the list
-                else:
+                if next_col and color != individual[row, col + 1]:
                     neighbours[row, col].setdefault(individual[row, col + 1], []).append((row, col + 1))
-
-            # Push current neighbours to the next pixel of the field if there will be a change
-            # Change conflict field if the current field already had a conflict (Move conflict)
-            if change == 1:
-                counts[row + 1, col] += counts[row, col]
-                counts[row, col] = 0
-                neighbours[row + 1, col].setdefault(color, []).append((row, col))
-                neighbours[row + 1, col] = update_neighbours(neighbours[row + 1, col], neighbours[row, col])
-
-                conflicts[color] = [conf if conf[0] != (row, col) else ((row + 1, col), conf[1]) for conf in
-                                    conflicts[color]]
-                conflicts[color] = [conf if conf[1] != (row, col) else (conf[0], (row + 1, col)) for conf in
-                                    conflicts[color]]
-            elif change == 2:
-                counts[row, col + 1] += counts[row, col]
-                counts[row, col] = 0
-                neighbours[row, col + 1].setdefault(color, []).append((row, col))
-                neighbours[row, col + 1] = update_neighbours(neighbours[row, col + 1], neighbours[row, col])
-
-                conflicts[color] = [conf if conf[0] != (row, col) else ((row, col + 1), conf[1]) for conf in
-                                    conflicts[color]]
-                conflicts[color] = [conf if conf[1] != (row, col) else (conf[0], (row, col + 1)) for conf in
-                                    conflicts[color]]
-
+                if row - 1 >= 0 and color != individual[row - 1, col]:
+                    neighbours[row, col].setdefault(individual[row - 1, col], []).append((row - 1, col))
+                if col - 1 >= 0 and color != individual[row, col - 1]:
+                    neighbours[row, col].setdefault(individual[row, col - 1], []).append((row, col - 1))
+                # Move horizontal and create a conflict with the vertical field that can later be resolved
+                if next_row and next_col and color == individual[row + 1, col] and color == individual[row, col + 1]:
+                    counts[row + 1, col] += counts[row, col]
+                    neighbours[row + 1, col] = update_neighbours(neighbours[row + 1, col], neighbours[row, col])
+                    counts[row, col] = 0
+                    conflicts[color] += [((row + 1, col), (row, col + 1))]
+                    change = 1
+                # Move horizontal
+                elif next_row and color == individual[row + 1, col]:
+                    counts[row + 1, col] += counts[row, col]
+                    neighbours[row + 1, col] = update_neighbours(neighbours[row + 1, col], neighbours[row, col])
+                    counts[row, col] = 0
+                    change = 1
+                # Move vertical
+                elif next_col and color == individual[row, col + 1]:
+                    counts[row, col + 1] += counts[row, col]
+                    neighbours[row, col + 1] = update_neighbours(neighbours[row, col + 1], neighbours[row, col])
+                    counts[row, col] = 0
+                    change = 2
+                # Change conflict field if the current field already had a conflict (Move conflict)
+                if change == 1:
+                    conflicts[color] = [conf if conf[0] != (row, col) else ((row + 1, col), conf[1]) for conf in
+                                        conflicts[color]]
+                    conflicts[color] = [conf if conf[1] != (row, col) else (conf[0], (row + 1, col)) for conf in
+                                        conflicts[color]]
+                elif change == 2:
+                    conflicts[color] = [conf if conf[0] != (row, col) else ((row, col + 1), conf[1]) for conf in
+                                        conflicts[color]]
+                    conflicts[color] = [conf if conf[1] != (row, col) else (conf[0], (row, col + 1)) for conf in
+                                        conflicts[color]]
     # Resolve conflicts
     for color in conflicts:
         for conf in conflicts[color]:
             if conf[0] != conf[1]:
                 counts[conf[0][0], conf[0][1]] += counts[conf[1][0], conf[1][1]]
-                neighbours[conf[1][0], conf[1][1]].setdefault(color, []).append((conf[1][0], conf[1][1]))
-                neighbours[conf[0][0], conf[0][1]] = update_neighbours(neighbours[conf[0][0], conf[0][1]],
-                                                                       neighbours[conf[1][0], conf[1][1]])
+                neighbours[conf[0][0], conf[0][1]] = update_neighbours(neighbours[conf[0][0], conf[0][1]], neighbours[conf[1][0], conf[1][1]])
                 counts[conf[1][0], conf[1][1]] = 0
-
-    # Filter out all field representatives
-    field_representatives = []
+    # Assign each field to the color with its coordinates, counts and neighbour counts
     for row in range(0, individual.shape[0]):
         for col in range(0, individual.shape[1]):
             if counts[row, col]:
-                field_representatives.append((row, col))
-                neighbours[row, col].setdefault(individual[row, col], []).append((row, col))
-
-    # Assign each field to the color with its coordinates, counts and neighbour counts
-    for rep in field_representatives:
-        neighbour_fields = dict()
-        for color in neighbours[rep[0], rep[1]]:
-            if color != individual[rep[0], rep[1]]:
-                for o_rep in field_representatives:
-                    if color in neighbours[o_rep[0], o_rep[1]] and individual[
-                        o_rep[0], o_rep[1]] == color and o_rep != rep:
-                        count = 0
-                        for pixel in neighbours[o_rep[0], o_rep[1]][color]:
-                            if pixel in neighbours[rep[0], rep[1]][color]:
-                                count += 1
-                        if count > 0:
-                            neighbour_fields.setdefault(color, []).append((o_rep, count))
-        fields.setdefault(individual[rep[0], rep[1]], []).append(
-            (neighbours[rep[0], rep[1]][individual[rep[0], rep[1]]], counts[rep[0], rep[1]], neighbour_fields))
-
+                neighbours_num = dict()
+                for color in neighbours[row, col]:
+                    neighbours_num[color] = len(set(neighbours[row, col][color]))
+                fields.setdefault(individual[row, col], []).append(((row, col) ,counts[row, col], neighbours_num))
     # Calculate the pixel counts of each color
+    color_numbers = [0] * COLORS
     for color in fields:
         for field in fields[color]:
             color_numbers[color - 1] += field[1]
-
-    # The individual array (the picture)
+    print(counts)
+    print(neighbours)
     print(individual)
-    print("")
-    # The counts of each color (index = color_num - 1)
+    print(fields)
     print(color_numbers)
-    print("")
-    # Dictionary with all fields sorted by color as key and filled with list of fields
-    # Fields: ('all field pixels', 'pixel count', 'all neighbour fields')
-    # 'all neighbour fields': dictionary with colors as key and list of ('field representative', 'number of neighbouring pixels')
-    for color in fields:
-        print("***Color", color, ":")
-        for field in fields[color]:
-            print("Field pixels: ", field[0])
-            print("Field pixel count: ", field[1])
-            print("Neighbours:")
-            for neigh_color in field[2]:
-                print("  Color", neigh_color, ":")
-                for neigh in field[2][neigh_color]:
-                    print("    Representative:", neigh[0], ", number of neighbours from that field:", neigh[1])
-            print("__________")
-        print("")
+
+
+# def draw(individual):
+#     for row in range(0, individual.shape[0]):
+#         for col in range(0, individual.shape[1]):
+#             color = individual[row, col]
+#             if color == 1:
+#                 individual[row, col] = [255,0,0]
+#             elif color == 2:
+#                 individual[row, col] = [0,255,0]
+#             elif color == 3:
+#                 individual[row, col] = [0,0,255]
+#    plt.imshow(individual, interpolation="nearest")
+#    plt.show()
 
 
 img = toolbox.individual()
 color_fields(img)
-
-plt.imshow(img, interpolation="nearest")
-plt.show()
+# draw(img)
