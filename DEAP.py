@@ -37,7 +37,7 @@ def color_fields(individual):
     color_numbers = [0] * COLORS
     counts = np.zeros(individual.shape, dtype=int) + 1
     neighbours = np.frompyfunc(dict, 0, 1)(np.empty((individual.shape[0], individual.shape[1]), dtype=object))
-    # Fields: ('all field pixels', 'pixel count', 'all neighbour fields')
+    # Fields: ('all field pixels', 'pixel count', 'all neighbour fields', ('max width', 'max height'))
     # 'all neighbour fields': dictionary with colors as key and list of ('field representative', 'number of neighbouring pixels')
     fields = dict()
     # Conflicts: dictionary with colors as key and list of ((x1, y1), (x2, y2))
@@ -47,8 +47,8 @@ def color_fields(individual):
         fields[i] = []
 
     # Count the number of pixels of the same color in each field
-    for col in range(0, individual.shape[0]):
-        for row in range(0, individual.shape[1]):
+    for row in range(0, individual.shape[0]):
+        for col in range(0, individual.shape[1]):
             color = individual[row, col]
             change = 0  # 0 = unchanged, 1 = vertical, 2 = horizontal
 
@@ -124,7 +124,7 @@ def color_fields(individual):
                 field_representatives.append((row, col))
                 neighbours[row, col].setdefault(individual[row, col], []).append((row, col))
 
-    # Assign each field to the color with its coordinates, counts and neighbour counts
+    # Assign each field to the color with its coordinates, counts, neighbour counts and its max. height and width
     for rep in field_representatives:
         neighbour_fields = dict()
         for color in neighbours[rep[0], rep[1]]:
@@ -138,8 +138,18 @@ def color_fields(individual):
                                 count += 1
                         if count > 0:
                             neighbour_fields.setdefault(color, []).append((o_rep, count))
-        fields.setdefault(individual[rep[0], rep[1]], []).append(
-            (neighbours[rep[0], rep[1]][individual[rep[0], rep[1]]], counts[rep[0], rep[1]], neighbour_fields))
+        # Get the maximum height and width (max_width/height = (smallest, biggest))
+        max_width = (individual.shape[0], 0)
+        max_height = (individual.shape[0], 0)
+        for pixel in neighbours[rep[0], rep[1]][individual[rep[0], rep[1]]]:
+            max_width = (min(max_width[0], pixel[0]), max(max_width[1], pixel[0]))
+            max_height = (min(max_height[0], pixel[1]), max(max_height[1], pixel[1]))
+
+        fields.setdefault(individual[rep[0], rep[1]], []).append((
+                                                                 neighbours[rep[0], rep[1]][individual[rep[0], rep[1]]],
+                                                                 counts[rep[0], rep[1]], neighbour_fields, (
+                                                                 max_width[1] - max_width[0] + 1,
+                                                                 max_height[1] - max_height[0] + 1)))
 
     # Calculate the pixel counts of each color
     for color in fields:
@@ -153,13 +163,15 @@ def color_fields(individual):
     print(color_numbers)
     print("")
     # Dictionary with all fields sorted by color as key and filled with list of fields
-    # Fields: ('all field pixels', 'pixel count', 'all neighbour fields')
+    # Fields: ('all field pixels', 'pixel count', 'all neighbour fields', ('max width', 'max height'))
     # 'all neighbour fields': dictionary with colors as key and list of ('field representative', 'number of neighbouring pixels')
     for color in fields:
         print("***Color", color, ":")
         for field in fields[color]:
             print("Field pixels: ", field[0])
             print("Field pixel count: ", field[1])
+            print("Maximal Width: ", field[3][0])
+            print("Maximal Height: ", field[3][1])
             print("Neighbours:")
             for neigh_color in field[2]:
                 print("  Color", neigh_color, ":")
