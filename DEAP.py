@@ -151,38 +151,78 @@ def color_fields(individual):
                                                                  max_width[1] - max_width[0] + 1,
                                                                  max_height[1] - max_height[0] + 1)))
 
+    # # The individual array (the picture)
+    # print(individual)
+    # print("")
+    # # The counts of each color (index = color_num - 1)
+    # print(color_numbers)
+    # print("")
+    # # Dictionary with all fields sorted by color as key and filled with list of fields
+    # # Fields: ('all field pixels', 'pixel count', 'all neighbour fields', ('max width', 'max height'))
+    # # 'all neighbour fields': dictionary with colors as key and list of ('field representative', 'number of neighbouring pixels')
+    # for color in fields:
+    #     print("***Color", color, ":")
+    #     for field in fields[color]:
+    #         print("Field pixels: ", field[0])
+    #         print("Field pixel count: ", field[1])
+    #         print("Maximal Width: ", field[3][0])
+    #         print("Maximal Height: ", field[3][1])
+    #         print("Neighbours:")
+    #         for neigh_color in field[2]:
+    #             print("  Color", neigh_color, ":")
+    #             for neigh in field[2][neigh_color]:
+    #                 print("    Representative:", neigh[0], ", number of neighbours from that field:", neigh[1])
+    #         print("__________")
+    #     print("")
+
+    return fields
+
+
+def color_count_eval(individual, fields):
     # Calculate the pixel counts of each color
+    color_numbers = []
     for color in fields:
         for field in fields[color]:
             color_numbers[color - 1] += field[1]
 
-    # The individual array (the picture)
-    print(individual)
-    print("")
-    # The counts of each color (index = color_num - 1)
-    print(color_numbers)
-    print("")
-    # Dictionary with all fields sorted by color as key and filled with list of fields
-    # Fields: ('all field pixels', 'pixel count', 'all neighbour fields', ('max width', 'max height'))
-    # 'all neighbour fields': dictionary with colors as key and list of ('field representative', 'number of neighbouring pixels')
-    for color in fields:
-        print("***Color", color, ":")
-        for field in fields[color]:
-            print("Field pixels: ", field[0])
-            print("Field pixel count: ", field[1])
-            print("Maximal Width: ", field[3][0])
-            print("Maximal Height: ", field[3][1])
-            print("Neighbours:")
-            for neigh_color in field[2]:
-                print("  Color", neigh_color, ":")
-                for neigh in field[2][neigh_color]:
-                    print("    Representative:", neigh[0], ", number of neighbours from that field:", neigh[1])
-            print("__________")
-        print("")
+    # Fitness Hyperparameters for color_counts (= cc)
+    big_cc = COLORS / 4
+    small_cc = COLORS / 4
+    big_cc_border = individual.size - individual.size / 4
+    small_cc_border = individual.size / 4
+    big_cc_penalty = 1
+    normal_cc_penalty = 1
+    small_cc_penalty = 1
+    big_cc_penalty_step_size = individual.size / 30
+    normal_cc_penalty_step_size = individual.size / 30
+    small_cc_penalty_step_size = individual.size / 30
+
+    # Calculate Fitness Value for the color_counts (lower is better)
+    # Function: (Distance to next border / Penalty Step Size) * Penalty for each step
+    cc_fitness = 0
+    counter_small = 0
+    counter_normal = 0
+    counter_big = 0
+    for cc in color_numbers:
+        if cc < small_cc_border:
+            if counter_small > small_cc:
+                cc_fitness += ((small_cc_border - cc) / small_cc_penalty_step_size) * small_cc_penalty
+        elif cc > big_cc_border:
+            if counter_big > big_cc:
+                cc_fitness += ((cc - big_cc_border) / big_cc_penalty_step_size) * big_cc_penalty
+        else:
+            if counter_normal > COLORS - big_cc + small_cc:
+                if counter_small > counter_big:
+                    cc_fitness += ((big_cc_border - cc) / normal_cc_penalty_step_size) * normal_cc_penalty
+                else:
+                    cc_fitness += ((cc - small_cc_border) / normal_cc_penalty_step_size) * normal_cc_penalty
+
+    return cc_fitness
 
 
-img = toolbox.individual()
-color_fields(img)
+ind = toolbox.individual()
+fields_g = color_fields(ind)
+cc_fitness_g = color_count_eval(ind, fields_g)
 
-plt.imshow(img, interpolation="nearest")
+plt.imshow(ind, interpolation="nearest")
 plt.show()
