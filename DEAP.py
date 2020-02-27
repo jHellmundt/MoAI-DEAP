@@ -186,14 +186,14 @@ def color_count_eval(individual, fields):
             color_numbers[color - 1] += field[1]
 
     # Fitness Hyperparameters for color_counts (= cc)
-    big_cc = COLORS / 4
+    big_cc = COLORS / 4 # Number of colors with big/small counts
     small_cc = COLORS / 4
-    big_cc_border = individual.size - individual.size / 4
+    big_cc_border = individual.size - individual.size / 4   # The color count that marks the point between big/small and normal count
     small_cc_border = individual.size / 4
-    big_cc_penalty = 1
+    big_cc_penalty = 1  # Penalty for each step
     normal_cc_penalty = 1
     small_cc_penalty = 1
-    big_cc_penalty_step_size = individual.size / 30
+    big_cc_penalty_step_size = individual.size / 30 # Size of a step
     normal_cc_penalty_step_size = individual.size / 30
     small_cc_penalty_step_size = individual.size / 30
 
