@@ -178,24 +178,24 @@ def color_fields(individual):
     return fields
 
 
-def color_count_eval(individual, fields):
+def color_count_eval(individual_size, fields):
+    # Fitness Hyperparameters for color_counts (= cc)
+    big_cc = COLORS / 4 # Number of colors with big/small counts
+    small_cc = COLORS / 4
+    big_cc_border = individual_size - individual_size / 4   # The color count that marks the point between big/small and normal count
+    small_cc_border = individual_size / 4
+    big_cc_penalty = 1  # Penalty for each step
+    normal_cc_penalty = 1
+    small_cc_penalty = 1
+    big_cc_penalty_step_size = individual_size / 30 # Size of a step
+    normal_cc_penalty_step_size = individual_size / 30
+    small_cc_penalty_step_size = individual_size / 30
+
     # Calculate the pixel counts of each color
     color_numbers = []
     for color in fields:
         for field in fields[color]:
             color_numbers[color - 1] += field[1]
-
-    # Fitness Hyperparameters for color_counts (= cc)
-    big_cc = COLORS / 4 # Number of colors with big/small counts
-    small_cc = COLORS / 4
-    big_cc_border = individual.size - individual.size / 4   # The color count that marks the point between big/small and normal count
-    small_cc_border = individual.size / 4
-    big_cc_penalty = 1  # Penalty for each step
-    normal_cc_penalty = 1
-    small_cc_penalty = 1
-    big_cc_penalty_step_size = individual.size / 30 # Size of a step
-    normal_cc_penalty_step_size = individual.size / 30
-    small_cc_penalty_step_size = individual.size / 30
 
     # Calculate Fitness Value for the color_counts (lower is better)
     # Function: (Distance to next border / Penalty Step Size) * Penalty for each step
@@ -220,9 +220,63 @@ def color_count_eval(individual, fields):
     return cc_fitness
 
 
+def neighbour_eval(individual_size, fields):
+    # Neighbour Evaluation hyperparameters 1
+    min_field_size = individual_size / 8
+
+    field_count = 0
+    for color in fields:
+        for field in fields[color]:
+            if field[1] >= min_field_size:
+                field_count += 1
+
+    # Neighbour Evaluation hyperparameters 2
+    count_no_circle = field_count * 0.3
+    count_small_circle = field_count * 0.4
+    count_big_circle = field_count * 0.3
+    small_circle_border = 0.4 # multiplied with neighbour count
+    big_circle_border = 0.75
+    no_circle_penalty = 4
+    small_circle_penalty = 2.5
+    big_circle_penalty = 1
+
+    neighbour_fitness = 0
+    for color in fields:
+        for field in fields[color]:
+            neigh_count = 0
+            neigh_color_count = dict()
+            for neigh_color in field[2]:
+                for neigh in field[2][neigh_color]:
+                    neigh_count += neigh[1]
+                    neigh_color_count.setdefault(neigh_color, []).append(neigh[1])
+            for neigh_color in neigh_color_count:
+                if neigh_count * big_circle_border < neigh_color_count[neigh_color]:
+                    if count_big_circle < 0:
+                        neighbour_fitness += big_circle_penalty
+                    count_big_circle -= 1
+                elif neigh_count * small_circle_border < neigh_color_count[neigh_color]:
+                    if count_small_circle < 0:
+                        neighbour_fitness += small_circle_penalty
+                    count_small_circle -= 1
+                else:
+                    if count_no_circle < 0:
+                        neighbour_fitness += no_circle_penalty
+                    count_no_circle -= 1
+
+    return neighbour_fitness
+
+
+def evaluation(individual):
+    fields = color_fields(individual)
+    color_count_fitness = color_count_eval(individual.size, fields)
+    neighbour_fitness = neighbour_eval(individual.size, fields)
+
+    return color_count_fitness + neighbour_fitness
+
+
 ind = toolbox.individual()
 fields_g = color_fields(ind)
-cc_fitness_g = color_count_eval(ind, fields_g)
+cc_fitness_g = color_count_eval(ind.size, fields_g)
 
 plt.imshow(ind, interpolation="nearest")
 plt.show()
